@@ -49,6 +49,13 @@ class NetworkingService {
     func createObservableResponse<T: Request>(request: T) -> Observable<T.ParsedResponseType> {
         return urlSession.rx
             .json(request: URLRequest(url: request.url))
+            .catchError({ (error) -> Observable<Any> in
+                let e = error as NSError
+                if e.domain == NSURLErrorDomain && e.code == NSURLErrorNotConnectedToInternet {
+                    throw NoInternetConnectionError()
+                }
+                throw ConnectionError(causedBy: error)
+            })
             .map { rawData in
                 guard let data = rawData as? T.RawResponseType else {
                     throw UnexpectedResponse(response: rawData)
@@ -67,6 +74,18 @@ struct UnexpectedResponse: Error {
     let response: Any
 }
 
+/**
+The generic error which is thrown when connection/networking error occurs.
+ */
+struct ConnectionError: Error {
+
+    /** The cause why connection error occurs. */
+    let causedBy: Error
+}
+/**
+The error which occurs when there is no internet connection.
+ */
+struct NoInternetConnectionError: Error {}
 
 /**
 The request which fetches the list of campaigns.
